@@ -1,6 +1,11 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
-import { CreateTaskDto } from './dto/create-task.dto';
-import { UpdateTaskDto } from './dto/update-task.dto';
+import { ZodValidationPipe } from '../common/zod-validation.pipe';
+import {
+  CreateTaskInput,
+  UpdateTaskInput,
+  createTaskSchema,
+  updateTaskSchema
+} from './dto/task.schema';
 import { TasksService } from './tasks.service';
 
 @Controller('api/tasks')
@@ -18,13 +23,16 @@ export class TasksController {
   }
 
   @Post()
-  create(@Body() dto: CreateTaskDto) {
-    return this.tasks.create(dto);
+  create(@Body(new ZodValidationPipe(createTaskSchema)) input: CreateTaskInput) {
+    return this.tasks.create(input);
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateTaskDto) {
-    return this.tasks.update(id, dto);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body(new ZodValidationPipe(updateTaskSchema)) input: UpdateTaskInput
+  ) {
+    return this.tasks.update(id, input);
   }
 
   @Delete(':id')

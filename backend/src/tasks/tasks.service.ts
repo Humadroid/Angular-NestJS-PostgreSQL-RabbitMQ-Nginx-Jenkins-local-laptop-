@@ -1,51 +1,48 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Task } from './task.entity';
-import { CreateTaskDto } from './dto/create-task.dto';
-import { UpdateTaskDto } from './dto/update-task.dto';
+import type { Task } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateTaskInput, UpdateTaskInput } from './dto/task.schema';
 import { TaskEventsService } from './task-events.service';
 
 @Injectable()
 export class TasksService {
   constructor(
-    @InjectRepository(Task) private readonly tasks: Repository<Task>,
+    private readonly prisma: PrismaService,
     private readonly events: TaskEventsService
   ) {}
 
   findAll(): Promise<Task[]> {
-    return this.tasks.find({ order: { id: 'DESC' } });
+    return this.prisma.task.findMany({ orderBy: { id: 'desc' } });
   }
 
   async findOne(id: number): Promise<Task> {
-    const task = await this.tasks.findOneBy({ id });
+    const task = await this.prisma.task.findUnique({ where: { id } });
     if (!task) throw new NotFoundException(`Task ${id} not found`);
     return task;
   }
 
-  async create(dto: CreateTaskDto): Promise<Task> {
-    const task = await this.tasks.save(this.tasks.create({
-      title: dto.title.trim(),
-      description: dto.description?.trim() || null,
-      completed: dto.completed ?? false
-    }));
+  async create(input: CreateTaskInput): Promise<Task> {
+    const task = await this.prisma.task.create({
+      data: {
+        title: input.title,
+        description: input.description ?? null,
+        completed: input.completed ?? false
+      }
+    });
     await this.events.publish({ type: 'task.created', task });
     return task;
   }
 
-  async update(id: number, dto: UpdateTaskDto): Promise<Task> {
-    const task = await this.findOne(id);
-    if (dto.title !== undefined) task.title = dto.title.trim();
-    if (dto.description !== undefined) task.description = dto.description?.trim() || null;
-    if (dto.completed !== undefined) task.completed = dto.completed;
-    const saved = await this.tasks.save(task);
-    await this.events.publish({ type: 'task.updated', task: saved });
-    return saved;
+  async update(id: number, input: UpdateTaskInput): Promise<Task> {
+    await this.findOne(id);
+    const task = await this.prisma.task.update({ where: { id }, data: input });
+    await this.events.publish({ type: 'task.updated', task });
+    return task;
   }
 
   async remove(id: number): Promise<{ deleted: true; id: number }> {
     const task = await this.findOne(id);
-    await this.tasks.remove(task);
+    await this.prisma.task.delete({ where: { id } });
     await this.events.publish({ type: 'task.deleted', task });
     return { deleted: true, id };
   }
