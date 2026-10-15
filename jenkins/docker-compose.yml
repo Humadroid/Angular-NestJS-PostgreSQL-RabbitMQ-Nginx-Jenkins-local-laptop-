@@ -13,7 +13,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Docker CLI talks to the host daemon. Compose build contexts are sent to it.
     environment:
-      JAVA_OPTS: "-Djenkins.install.runSetupWizard=true"
+      # disabled-for-polling lets the local pre-push hook call /git/notifyCommit without
+      # credentials, but Jenkins only polls SCM in response. It cannot be asked to build a
+      # caller-supplied commit.
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=true -Dhudson.plugins.git.GitStatus.NOTIFY_COMMIT_ACCESS_CONTROL=disabled-for-polling"
 
 volumes:
   jenkins_home:

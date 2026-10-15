@@ -121,10 +121,18 @@ Open http://localhost:8080, install suggested plugins, and create an admin user.
 2. In Jenkins, choose **New Item → Pipeline**.
 3. Under **Pipeline**, select **Pipeline script from SCM**.
 4. SCM: **Git**; Repository URL: your repository URL; Credentials: your token/credential if private; Branch: `*/main` (or your branch); Script Path: `Jenkinsfile`.
-5. Save and click **Build Now** once.
-6. The `pollSCM('* * * * *')` trigger in the Jenkinsfile checks the remote branch every minute. Commit and **push** changes; Jenkins should start a build after detecting the update.
+5. Save and click **Build Now** once. The job must build once before any trigger works, because Jenkins only learns the repository URL from that first checkout.
+6. Enable the bundled git hook so a build starts the moment you push:
+   ```bash
+   git config core.hooksPath jenkins/hooks
+   ```
+   On Linux/macOS also run `chmod +x jenkins/hooks/pre-push` if the file lost its executable bit.
 
-This is local polling, so it is not instant and it detects pushed commits, not unpushed local commits. For instant webhook builds, the Jenkins URL must be reachable by GitHub/GitLab through a secure public tunnel and the corresponding webhook must be configured.
+`jenkins/hooks/pre-push` waits until the remote actually has the pushed commit, then calls `http://localhost:8080/git/notifyCommit?url=<your repo>`, which makes Jenkins poll immediately instead of waiting for the next minute. Set `JENKINS_URL` in your environment if Jenkins does not run on `localhost:8080`. The hook fails silently, so a stopped Jenkins never blocks a push.
+
+`pollSCM('* * * * *')` stays in the Jenkinsfile as a fallback for pushes made from a clone without the hook. Both paths detect **pushed** commits, not unpushed local ones. For GitHub to push the event itself, the Jenkins URL must be reachable through a secure public tunnel and a webhook must be configured in the repository.
+
+`NOTIFY_COMMIT_ACCESS_CONTROL=disabled-for-polling` in `jenkins/docker-compose.yml` is what allows the unauthenticated `notifyCommit` call. It limits the endpoint to triggering a poll; it cannot be used to build an arbitrary commit.
 
 ### What a build does
 1. **Checkout** the pushed commit.

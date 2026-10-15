@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     triggers {
-        // Poll the configured Git repository every minute. A local-only Jenkins
-        // cannot receive a GitHub webhook unless a public tunnel is configured.
+        // jenkins/hooks/pre-push calls /git/notifyCommit after a push, which triggers an
+        // immediate poll. This schedule is the fallback for pushes made without the hook.
         pollSCM('* * * * *')
     }
 

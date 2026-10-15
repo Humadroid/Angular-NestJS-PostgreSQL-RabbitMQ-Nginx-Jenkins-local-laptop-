@@ -1,0 +1,32 @@
+#!/bin/sh
+# Pings the local Jenkins as soon as a push lands so a build starts within
+# seconds instead of waiting for the pollSCM window.
+# Enable with:  git config core.hooksPath jenkins/hooks
+
+JENKINS_URL="${JENKINS_URL:-http://localhost:8080}"
+remote_url="$2"
+zero="0000000000000000000000000000000000000000"
+
+export GIT_TERMINAL_PROMPT=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ "$local_sha" = "$zero" ] && continue
+
+    (
+        attempt=0
+        while [ "$attempt" -lt 15 ]; do
+            # notifyCommit makes Jenkins poll, so only notify once the remote really has the commit.
+            if [ "$(git ls-remote "$remote_url" "$remote_ref" 2>/dev/null | cut -f1)" = "$local_sha" ]; then
+                curl -fsS --max-time 10 --get \
+                    --data-urlencode "url=$remote_url" \
+                    --data-urlencode "branch=${remote_ref#refs/heads/}" \
+                    "$JENKINS_URL/git/notifyCommit"
+                exit 0
+            fi
+            attempt=$((attempt + 1))
+            sleep 1
+        done
+    ) >/dev/null 2>&1 &
+done
+
+exit 0
