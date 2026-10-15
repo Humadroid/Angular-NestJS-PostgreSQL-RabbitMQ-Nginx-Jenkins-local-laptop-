@@ -1,11 +1,8 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
-import {
-  CreateTaskInput,
-  UpdateTaskInput,
-  createTaskSchema,
-  updateTaskSchema
-} from './dto/task.schema';
+import { createTaskSchema, updateTaskSchema } from './dto/task.schema';
+// isolatedModules + emitDecoratorMetadata requires types in decorated signatures to be type-only imports.
+import type { CreateTaskInput, UpdateTaskInput } from './dto/task.schema';
 import { TasksService } from './tasks.service';
 
 @Controller('api/tasks')
