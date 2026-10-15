@@ -16,11 +16,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: "3000"
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_USER: hello
-      DB_PASSWORD: hello-change-this
-      DB_NAME: hello
+      DATABASE_URL: "postgresql://hello:hello-change-this@postgres:5432/hello?schema=public"
       RABBITMQ_URL: amqp://hello:hello-change-this@rabbitmq:5672
     depends_on:
       postgres:
