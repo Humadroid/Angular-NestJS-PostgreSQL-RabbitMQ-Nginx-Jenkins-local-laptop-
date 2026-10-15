@@ -88,5 +88,8 @@ pipeline {
         success {
             echo "Deployed. App: ${env.APP_URL}  API health: ${env.APP_URL}/api/health"
         }
+        failure {
+            sh 'docker compose -p helloapp -f docker-compose.yml logs --tail 60 backend frontend || true'
+        }
     }
 }
