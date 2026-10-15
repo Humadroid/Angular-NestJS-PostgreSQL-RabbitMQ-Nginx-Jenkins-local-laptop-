@@ -12,6 +12,10 @@ pipeline {
         disableConcurrentBuilds()
     }
 
+    environment {
+        APP_URL = 'http://localhost:8081'
+    }
+
     stages {
         stage('Checkout') {
             steps {
@@ -49,7 +53,7 @@ pipeline {
             steps {
                 // Stop containers from other compose projects that hold our published host ports.
                 sh '''
-                    for port in 8081 8082 5432 15672; do
+                    for port in 8081 8082 5432 5672 15672; do
                       docker ps --filter "publish=$port" --format '{{.ID}} {{.Label "com.docker.compose.project"}}' | while read id project; do
                         if [ "$project" != "helloapp" ]; then
                           echo "Stopping $id (project '$project') holding port $port"
@@ -77,6 +81,12 @@ pipeline {
                     exit 1
                 '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Deployed. App: ${env.APP_URL}  API health: ${env.APP_URL}/api/health"
         }
     }
 }

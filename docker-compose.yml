@@ -52,6 +52,7 @@ services:
       RABBITMQ_DEFAULT_USER: hello
       RABBITMQ_DEFAULT_PASS: hello-change-this
     ports:
+      - "5672:5672"
       - "15672:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]

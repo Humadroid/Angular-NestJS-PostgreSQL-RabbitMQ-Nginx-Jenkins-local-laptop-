@@ -48,12 +48,14 @@ cd ..
 
 For Angular, keep the generated `package.json` and lockfile. The supplied `src/main.ts`, `src/app/app.ts`, `src/app/app.html`, `src/app/app.css`, and `src/styles.css` replace the corresponding generated source files. Keep the generated `angular.json`, TypeScript configs, and test runner config.
 
-## 2. Build and run locally
+## 2. Build and run everything in Docker
 ```bash
 docker compose up --build -d
 docker compose ps
 docker compose logs -f backend
 ```
+
+The compose project is named `helloapp`, so this is the same stack that Jenkins deploys. Running it by hand and running a Jenkins build replace each other instead of fighting over host ports.
 
 Open:
 - Angular app through Nginx: http://localhost:8081
@@ -61,8 +63,44 @@ Open:
 - RabbitMQ management: http://localhost:15672 (username `hello`, password `hello-change-this`)
 - Adminer DB UI: http://localhost:8082 (System: PostgreSQL, Server: `postgres`, Username: `hello`, Password: `hello-change-this`, Database: `hello`)
 - PostgreSQL TCP port: `localhost:5432` (use a database client; PostgreSQL is not a browser UI)
+- RabbitMQ AMQP port: `localhost:5672`
 
 The API is `http://localhost:8081/api/tasks`. Creating, editing, completing, and deleting tasks writes to PostgreSQL and publishes persistent JSON events to the RabbitMQ `task-events` queue.
+
+## 2b. Local development with hot reload
+Run PostgreSQL and RabbitMQ in Docker, and run the backend and frontend on your machine so both reload on save.
+
+Start the infrastructure only:
+```bash
+docker compose up -d postgres rabbitmq adminer
+```
+
+Backend (terminal 1):
+```bash
+cd backend
+npm install
+npm run dev
+```
+It listens on http://localhost:3000 and connects to `localhost:5432` and `localhost:5672` using the defaults in `src/app.module.ts` and `src/tasks/task-events.service.ts`. Override with the `DB_*` and `RABBITMQ_URL` environment variables if needed.
+
+Frontend (terminal 2):
+```bash
+cd frontend
+npm install
+npm start
+```
+Open http://localhost:4200. `frontend/proxy.conf.json` forwards `/api` to the backend on port 3000, so the same relative URLs work in development and in the Nginx image.
+
+Saving a task writes a row to the `tasks` table and publishes an event to the `task-events` queue. Verify with:
+```bash
+docker exec helloapp-postgres-1 psql -U hello -d hello -c "select id, title, completed from tasks order by id desc limit 5;"
+docker exec helloapp-rabbitmq-1 rabbitmqctl list_queues name messages
+```
+
+Stop the containerised `backend` and `frontend` services first if they are running, so the browser reaches your dev servers rather than the built images:
+```bash
+docker compose stop backend frontend
+```
 
 ## 3. Start Jenkins in Docker
 ```bash
@@ -88,6 +126,18 @@ Open http://localhost:8080, install suggested plugins, and create an admin user.
 
 This is local polling, so it is not instant and it detects pushed commits, not unpushed local commits. For instant webhook builds, the Jenkins URL must be reachable by GitHub/GitLab through a secure public tunnel and the corresponding webhook must be configured.
 
+### What a build does
+1. **Checkout** the pushed commit.
+2. **Install and test backend** — `npm ci`, Jest, `nest build`.
+3. **Install, test and build frontend** — `npm ci`, Karma on headless Chrome, `ng build`.
+4. **Build Docker images** for the backend and frontend.
+5. **Deploy locally** — stops any container outside the `helloapp` project that holds ports 8081, 8082, 5432, 5672 or 15672, then recreates the stack. This is what makes repeated builds succeed instead of failing on "port is already allocated".
+6. **Smoke test** — polls `/api/health` through the Nginx container until it responds.
+
+On success the build log prints the deployed URL. The app is served at **http://localhost:8081** and the API health check at **http://localhost:8081/api/health**. Change `APP_URL` in the `environment` block of the `Jenkinsfile` if you publish the frontend on a different host or port.
+
+Because the deployment runs on your laptop's Docker daemon, the URL is reachable from your machine only. To share it, put a tunnel (for example `cloudflared` or `ngrok`) in front of port 8081.
+
 ## 5. Useful commands
 ```bash
 docker compose ps
@@ -103,4 +153,5 @@ docker compose down -v   # WARNING: deletes PostgreSQL data
 - TypeORM `synchronize: true` is demo-only. Use migrations in real projects.
 - Change sample credentials before using this beyond a local laptop.
 - The Angular Dockerfile expects `dist/frontend/browser`. If your generated `angular.json` uses a different output path, update the Dockerfile's `COPY --from=build` source.
-- If the Angular CLI-generated test command differs in your CLI version, adjust the frontend test stage in `Jenkinsfile` to match the generated runner.
+- The backend ships ESM-only NestJS 12 packages, so Jest runs through `node --experimental-vm-modules` with `ts-jest` in ESM mode (see the `jest` block in `backend/package.json` and `backend/tsconfig.spec.json`).
+- `frontend/karma.conf.js` launches headless Chrome with `--no-sandbox` because Jenkins runs as root in its container.
