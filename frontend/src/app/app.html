@@ -1,0 +1,48 @@
+<main class="container">
+  <header>
+    <p class="eyebrow">LOCAL FULL-STACK DEMO</p>
+    <h1>Task CRUD</h1>
+    <p>Angular · NestJS · PostgreSQL · RabbitMQ · Docker · Nginx · Jenkins</p>
+  </header>
+
+  <section class="panel">
+    <h2>{{ editingId === null ? 'Create task' : 'Edit task #' + editingId }}</h2>
+    <form (ngSubmit)="saveTask()">
+      <label>
+        Title
+        <input name="title" [(ngModel)]="title" required maxlength="200" placeholder="e.g. Learn Docker Compose">
+      </label>
+      <label>
+        Description
+        <textarea name="description" [(ngModel)]="description" rows="3" placeholder="Optional details"></textarea>
+      </label>
+      <div class="actions">
+        <button type="submit">{{ editingId === null ? 'Create task' : 'Save changes' }}</button>
+        <button type="button" class="secondary" *ngIf="editingId !== null" (click)="cancelEdit()">Cancel</button>
+        <button type="button" class="secondary" (click)="loadTasks()">Refresh</button>
+      </div>
+    </form>
+    <p class="success" *ngIf="status">{{ status }}</p>
+    <p class="error" *ngIf="error">{{ error }}</p>
+  </section>
+
+  <section class="panel">
+    <div class="list-heading">
+      <h2>Tasks</h2>
+      <span>{{ tasks.length }} total</span>
+    </div>
+    <p *ngIf="tasks.length === 0">No tasks yet. Create one above.</p>
+    <article class="task" *ngFor="let task of tasks">
+      <input type="checkbox" [checked]="task.completed" (change)="toggleTask(task)" [attr.aria-label]="'Complete ' + task.title">
+      <div class="task-content">
+        <strong [class.completed]="task.completed">{{ task.title }}</strong>
+        <p *ngIf="task.description">{{ task.description }}</p>
+        <small>ID {{ task.id }} · {{ task.completed ? 'Completed' : 'Open' }}</small>
+      </div>
+      <div class="task-actions">
+        <button type="button" class="secondary" (click)="editTask(task)">Edit</button>
+        <button type="button" class="danger" (click)="deleteTask(task)">Delete</button>
+      </div>
+    </article>
+  </section>
+</main>
