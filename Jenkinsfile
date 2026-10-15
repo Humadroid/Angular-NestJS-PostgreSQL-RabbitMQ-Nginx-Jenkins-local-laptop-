@@ -47,6 +47,18 @@ pipeline {
 
         stage('Deploy locally') {
             steps {
+                // Stop containers from other compose projects that hold our published host ports.
+                sh '''
+                    for port in 8081 8082 5432 15672; do
+                      docker ps --filter "publish=$port" --format '{{.ID}} {{.Label "com.docker.compose.project"}}' | while read id project; do
+                        if [ "$project" != "helloapp" ]; then
+                          echo "Stopping $id (project '$project') holding port $port"
+                          docker stop "$id"
+                        fi
+                      done
+                    done
+                '''
+                sh 'docker compose -p helloapp -f docker-compose.yml down --remove-orphans'
                 sh 'docker compose -p helloapp -f docker-compose.yml up -d --remove-orphans'
                 sh 'docker compose -p helloapp -f docker-compose.yml ps'
             }
